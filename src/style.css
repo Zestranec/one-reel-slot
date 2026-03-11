@@ -1,0 +1,45 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: #08081a;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100dvh;
+  padding: 16px 8px 24px;
+  font-family: system-ui, Arial, sans-serif;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* The PixiJS canvas:
+   - max-width is set by JS to match logical canvas width (780 desktop / 390 mobile)
+   - width: 100% scales it down on narrow viewports
+   - height: auto maintains the canvas's intrinsic aspect ratio
+*/
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(100, 100, 200, 0.15),
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 64px rgba(241, 196, 15, 0.06);
+}

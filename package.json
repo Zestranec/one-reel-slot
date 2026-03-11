@@ -1,0 +1,21 @@
+{
+  "name": "one-reel-slot",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "simulate": "npx tsx scripts/simulate.ts",
+    "simulate:1m": "npx tsx scripts/simulate.ts 1000000"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "~5.9.3",
+    "vite": "^5.4.21"
+  },
+  "dependencies": {
+    "pixi.js": "^8.17.0"
+  }
+}
