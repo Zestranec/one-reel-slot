@@ -19,11 +19,11 @@ export interface SymbolConfig {
 
 /** Symbol probabilities must sum to 1.0 */
 export const SYMBOLS: SymbolConfig[] = [
-  { id: 'Clover',      probability: 0.10  },
-  { id: 'ForgetMeNot', probability: 0.14  },
-  { id: 'Rose',        probability: 0.20  },
-  { id: 'GoldenSeed',  probability: 0.07  },
-  { id: 'Tumbleweed',  probability: 0.49  },
+  { id: 'Clover',      probability: 0.106 },
+  { id: 'ForgetMeNot', probability: 0.140 },
+  { id: 'Rose',        probability: 0.200 },
+  { id: 'GoldenSeed',  probability: 0.070 },
+  { id: 'Tumbleweed',  probability: 0.484 },
 ];
 
 // Sanity check (dev only)
@@ -33,12 +33,12 @@ if (Math.abs(probabilitySum - 1.0) > 1e-9) {
 }
 
 /** Ladder pay per level (index 0 = level 0 = no payout, index 1 = level 1, etc.) */
-export const CLOVER_PAY: readonly number[]        = [0,  2,  6, 18,  50, 140];
-export const FORGET_ME_NOT_PAY: readonly number[] = [0,  1,  3,  7,  16,  40];
-export const ROSE_PAY: readonly number[]          = [0,  1,  2,  3,   5,   8];
+export const CLOVER_PAY: readonly number[]        = [0,  3, 10, 30,  83, 232];
+export const FORGET_ME_NOT_PAY: readonly number[] = [0,  1,  4, 12,  27,  66];
+export const ROSE_PAY: readonly number[]          = [0,  2,  3,  5,   8,  13];
 
 /** Bonus awarded when ALL three ladders reach level 5 simultaneously. */
-export const FLOWER_BONUS = 250;
+export const FLOWER_BONUS = 415;
 
 /** Maximum ladder level */
 export const MAX_LEVEL = 5;
