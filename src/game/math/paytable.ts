@@ -7,7 +7,7 @@
  *  - GoldenSeed meaningfully present
  *  - Flower Bonus rare but reachable in large simulations
  *  - Collect threshold creates push-your-luck tension
- *  - RTP ≈ 95%
+ *  - RTP ≈ 97.5%
  */
 
 export type SymbolId = 'Clover' | 'ForgetMeNot' | 'Rose' | 'GoldenSeed' | 'Tumbleweed';
@@ -19,11 +19,11 @@ export interface SymbolConfig {
 
 /** Symbol probabilities must sum to 1.0 */
 export const SYMBOLS: SymbolConfig[] = [
-  { id: 'Clover',      probability: 0.106 },
-  { id: 'ForgetMeNot', probability: 0.140 },
-  { id: 'Rose',        probability: 0.200 },
-  { id: 'GoldenSeed',  probability: 0.070 },
-  { id: 'Tumbleweed',  probability: 0.484 },
+  { id: 'Clover',      probability: 0.121 },
+  { id: 'ForgetMeNot', probability: 0.160 },
+  { id: 'Rose',        probability: 0.229 },
+  { id: 'GoldenSeed',  probability: 0.080 },
+  { id: 'Tumbleweed',  probability: 0.410 },
 ];
 
 // Sanity check (dev only)
@@ -33,9 +33,9 @@ if (Math.abs(probabilitySum - 1.0) > 1e-9) {
 }
 
 /** Ladder pay per level (index 0 = level 0 = no payout, index 1 = level 1, etc.) */
-export const CLOVER_PAY: readonly number[]        = [0,  3, 10, 30,  83, 232];
-export const FORGET_ME_NOT_PAY: readonly number[] = [0,  1,  4, 12,  27,  66];
-export const ROSE_PAY: readonly number[]          = [0,  2,  3,  5,   8,  13];
+export const CLOVER_PAY: readonly number[]        = [0,  3,  9, 26,  72, 210];
+export const FORGET_ME_NOT_PAY: readonly number[] = [0,  1,  4, 10,  24,  58];
+export const ROSE_PAY: readonly number[]          = [0,  1,  2,  4,   7,  12];
 
 /** Bonus awarded when ALL three ladders reach level 5 simultaneously. */
 export const FLOWER_BONUS = 415;

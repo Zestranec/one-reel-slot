@@ -253,6 +253,68 @@ for (const c of CANDIDATES) {
   console.log(`  ${c.label.padEnd(40)} ${(r.rtp*100).toFixed(2).padStart(6)}% ${r.avgN.toFixed(2).padStart(6)} ${r.avgCV.toFixed(2).padStart(6)} ${(r.pct3*100).toFixed(1).padStart(5)}%${flag}`);
 }
 
+// ── New-paytable Bot-A (greedy) sweep — target 97.5% RTP ─────────────────────
+// Uses the Step-1 paytable with proportionally-scaled probabilities as Tw varies.
+// Base non-Tw ratio: C=0.106, F=0.140, R=0.200, GS=0.070 (sum=0.516)
+
+const NP_CLOVER  = [0,  3,  9, 26,  72, 210];
+const NP_FMN     = [0,  1,  4, 10,  24,  58];
+const NP_ROSE    = [0,  1,  2,  4,   7,  12];
+const NP_FLOWER  = 415;
+const NP_THRESH  = 5;
+
+function runSimNP(p: ProbaTest, rounds = 400_000): { rtp: number; avgN: number; avgCV: number; pct3: number; pct5: number } {
+  const rng  = new RNG(42);
+  const resolve = makeResolver(...p.probs);
+  const bet = 1;
+  let wg = 0, pd = 0, sp = 0, c3 = 0, c5 = 0;
+  for (let r = 0; r < rounds; r++) {
+    let c=0, f=0, ro=0, peak=0;
+    let done = false;
+    while (!done) {
+      const sym = resolve(rng.next());
+      sp++; wg += bet;
+      switch (sym) {
+        case 'Clover':      c  = clamp(c +1, MAX_LEVEL); break;
+        case 'ForgetMeNot': f  = clamp(f +1, MAX_LEVEL); break;
+        case 'Rose':        ro = clamp(ro+1, MAX_LEVEL); break;
+        case 'GoldenSeed':
+          c=clamp(c+1,MAX_LEVEL); f=clamp(f+1,MAX_LEVEL); ro=clamp(ro+1,MAX_LEVEL); break;
+        case 'Tumbleweed': c=0; f=0; ro=0; break;
+      }
+      const p2 = c+f+ro; if (p2 > peak) peak = p2;
+      const bonus = (c===MAX_LEVEL && f===MAX_LEVEL && ro===MAX_LEVEL) ? NP_FLOWER : 0;
+      const cv = (NP_CLOVER[c]+NP_FMN[f]+NP_ROSE[ro]+bonus)*bet;
+      if (cv >= NP_THRESH) { pd += cv; done = true; }
+    }
+    if (peak >= 3) c3++;
+    if (peak >= 5) c5++;
+  }
+  return { rtp: pd/wg, avgN: sp/rounds, avgCV: pd/rounds, pct3: c3/rounds, pct5: c5/rounds };
+}
+
+// Proportional scaling from base non-Tw (C=0.106 F=0.140 R=0.200 GS=0.070 sum=0.516)
+const NP_TW_SWEEP: ProbaTest[] = [
+  { label: 'Tw=0.412',  probs: [0.121, 0.160, 0.228, 0.079, 0.412] },
+  { label: 'Tw=0.411',  probs: [0.121, 0.160, 0.228, 0.080, 0.411] },
+  { label: 'Tw=0.410',  probs: [0.121, 0.160, 0.229, 0.080, 0.410] },
+  { label: 'Tw=0.409',  probs: [0.121, 0.160, 0.229, 0.081, 0.409] },
+  { label: 'Tw=0.408',  probs: [0.121, 0.161, 0.229, 0.081, 0.408] },
+];
+
+console.log('\n── New paytable — Bot-A (greedy) Tumbleweed sweep (target 97.5%) ────────');
+console.log('  Probabilities              RTP     avgN  avgCV  ≥3lvl  ≥5lvl');
+console.log('  ' + '─'.repeat(72));
+for (const t of NP_TW_SWEEP) {
+  const r = runSimNP(t);
+  const flag = Math.abs(r.rtp - 0.975) < 0.025 ? ' ← target' : '';
+  console.log(
+    `  ${t.label.padEnd(24)} ${(r.rtp*100).toFixed(2).padStart(6)}%` +
+    ` ${r.avgN.toFixed(2).padStart(5)} ${r.avgCV.toFixed(2).padStart(6)}` +
+    ` ${(r.pct3*100).toFixed(1).padStart(5)}% ${(r.pct5*100).toFixed(1).padStart(5)}%${flag}`,
+  );
+}
+
 // ── Sweep ────────────────────────────────────────────────────────────────────
 // Fine-grained scan around the non-linear phase transition (scale ≈ 5/3 ≈ 1.667)
 const scales = [1.50, 1.55, 1.58, 1.60, 1.62, 1.64, 1.66, 1.667, 1.67, 1.70, 1.75, 1.80];
