@@ -1,161 +1,136 @@
 /**
- * ReelView — single centered reel card, sized by layout.
+ * ReelView — single reel card with fully animated strip.
  *
- * Animation only presents the pre-decided symbol; it does NOT determine outcome.
+ * External API is unchanged from the previous version:
+ *   spinTo(symbol)   → Promise<void>
+ *   pulse(color)     → void
+ *   reset()          → void
+ *   spinning         → boolean (getter)
+ *   container        → PIXI.Container
+ *
+ * Internally delegates to Reel (strip + scroll) and ReelController (state machine).
+ *
+ * Outcome is always decided BEFORE spinTo() is called.
+ * The animation only presents the pre-decided symbol — no outcome logic here.
  */
 import * as PIXI from 'pixi.js';
 import { type SymbolId } from '../math/paytable';
-
-const SYMBOL_ORDER: SymbolId[] = ['Clover', 'ForgetMeNot', 'Rose', 'GoldenSeed', 'Tumbleweed'];
-
-const SYMBOL_EMOJI: Record<SymbolId, string> = {
-  Clover:      '🍀',
-  ForgetMeNot: '💙',
-  Rose:        '🌹',
-  GoldenSeed:  '✨',
-  Tumbleweed:  '💨',
-};
-
-const SYMBOL_COLOR: Record<SymbolId, number> = {
-  Clover:      0x2ecc71,
-  ForgetMeNot: 0x3498db,
-  Rose:        0xe74c3c,
-  GoldenSeed:  0xf1c40f,
-  Tumbleweed:  0x95a5a6,
-};
-
-const SPIN_DURATION_MS = 800;
+import { Reel } from './reel/Reel';
+import { ReelController } from './reel/ReelController';
+import { DEFAULT_REEL_CONFIG } from './reel/ReelConfig';
 
 export class ReelView {
   readonly container: PIXI.Container;
-  private size: number;
-  private bg: PIXI.Graphics;
-  private symbolText: PIXI.Text;
-  private labelText: PIXI.Text;
-  private spinTween: number | null = null;
+
+  private readonly outerBg: PIXI.Graphics;
+  private readonly reel: Reel;
+  private readonly ctrl: ReelController;
+  private readonly tickFn: (t: PIXI.Ticker) => void;
+
   private _spinning = false;
+  private lastSymbol: SymbolId | null = null;
+  private readonly size: number;
 
   constructor(size: number) {
     this.size = size;
     this.container = new PIXI.Container();
 
-    this.bg = new PIXI.Graphics();
-    this.drawBg(0x12122a, 0x2a2a50, 2);
-    this.container.addChild(this.bg);
+    // Outer card border — visible around the inner reel strip.
+    this.outerBg = new PIXI.Graphics();
+    this.drawOuterBg(0x12122a, 0x2a2a50, 2);
+    this.container.addChild(this.outerBg);
 
-    const emojiFontSize = Math.round(size * 0.38);
-    this.symbolText = new PIXI.Text({
-      text: '?',
-      style: {
-        fontSize: emojiFontSize,
-        fill: 0x555577,
-        align: 'center',
-      },
-    });
-    this.symbolText.anchor.set(0.5);
-    this.symbolText.position.set(size / 2, size / 2 - Math.round(size * 0.07));
-    this.container.addChild(this.symbolText);
+    // Reel strip — occupies the same size×size area (cells are inset by 2px).
+    this.reel = new Reel(size);
+    this.container.addChild(this.reel.viewport);
 
-    const labelFontSize = Math.max(12, Math.round(size * 0.065));
-    this.labelText = new PIXI.Text({
-      text: '',
-      style: {
-        fontSize: labelFontSize,
-        fill: 0x888899,
-        align: 'center',
-        fontFamily: 'Arial',
-        letterSpacing: 1,
-      },
-    });
-    this.labelText.anchor.set(0.5);
-    this.labelText.position.set(size / 2, size - Math.round(size * 0.1));
-    this.container.addChild(this.labelText);
+    this.ctrl = new ReelController();
+
+    // Use the shared PIXI ticker so we integrate with the existing app loop.
+    // The handler is guarded by _spinning so it never runs outside a spin.
+    this.tickFn = (ticker: PIXI.Ticker) => {
+      if (this._spinning) {
+        this.ctrl.update(performance.now(), ticker.deltaMS);
+      }
+    };
+    PIXI.Ticker.shared.add(this.tickFn);
   }
 
-  private drawBg(fillColor: number, strokeColor: number, strokeW: number): void {
-    this.bg.clear();
-    this.bg
-      .roundRect(0, 0, this.size, this.size, 16)
-      .fill({ color: fillColor })
-      .stroke({ width: strokeW, color: strokeColor });
-  }
+  // ── Public API ─────────────────────────────────────────────────────────────
 
   get spinning(): boolean { return this._spinning; }
 
   /**
-   * Animate reel to the pre-decided symbol. Returns a Promise when done.
-   * The symbol was resolved BEFORE this call — animation is purely cosmetic.
+   * Animate the reel to the pre-decided symbol.
+   * Returns a Promise that resolves once the reel has fully settled.
+   *
+   * The symbol MUST be resolved by the caller before this is invoked —
+   * this method only presents it visually.
    */
   spinTo(symbol: SymbolId): Promise<void> {
     if (this._spinning) return Promise.resolve();
     this._spinning = true;
 
-    return new Promise((resolve) => {
-      const startTime = performance.now();
-      const syms = SYMBOL_ORDER;
-      let frame = 0;
-
-      const tick = () => {
-        const elapsed = performance.now() - startTime;
-
-        if (elapsed < SPIN_DURATION_MS - 240) {
-          this.showSymbol(syms[frame % syms.length], false);
-          frame++;
-          this.spinTween = window.setTimeout(tick, 75);
-        } else if (elapsed < SPIN_DURATION_MS) {
-          // Slow down: briefly show a neighbour for tactile feel
-          const targetIdx = syms.indexOf(symbol);
-          this.showSymbol(syms[(targetIdx + 1) % syms.length], false);
-          this.spinTween = window.setTimeout(tick, 160);
-        } else {
-          this.showSymbol(symbol, true);
-          this._spinning = false;
-          this.spinTween = null;
+    return new Promise<void>((resolve) => {
+      this.ctrl.spin(
+        this.reel,
+        DEFAULT_REEL_CONFIG,
+        symbol,
+        this.lastSymbol,
+        performance.now(),
+        () => {
+          this.lastSymbol = symbol;
+          this._spinning  = false;
           resolve();
-        }
-      };
-
-      this.spinTween = window.setTimeout(tick, 0);
+        },
+      );
     });
   }
 
-  private showSymbol(symbol: SymbolId, final: boolean): void {
-    this.symbolText.text = SYMBOL_EMOJI[symbol];
-
-    if (final) {
-      const c = SYMBOL_COLOR[symbol];
-      this.symbolText.style.fill = 0xffffff;
-      this.labelText.text = symbol.toUpperCase();
-      this.labelText.style.fill = c;
-      this.drawBg(0x0d0d1f, c, 3);
-    } else {
-      this.symbolText.style.fill = 0x7777aa;
-      this.labelText.text = '';
-      this.drawBg(0x12122a, 0x2a2a50, 2);
-    }
-  }
-
-  /** Flash reel border for emphasis (special symbol feedback). */
+  /**
+   * Flash the card border for emphasis (called after special symbol feedback).
+   * Does not interfere with the reel strip animation.
+   */
   pulse(color: number): void {
     let toggle = false;
-    let count = 0;
+    let count  = 0;
     const id = setInterval(() => {
-      this.drawBg(0x0d0d1f, toggle ? color : 0xffffff, 4);
+      this.drawOuterBg(0x0d0d1f, toggle ? color : 0xffffff, 4);
       toggle = !toggle;
-      if (++count >= 6) clearInterval(id);
+      if (++count >= 6) {
+        clearInterval(id);
+        this.drawOuterBg(0x0d0d1f, color, 3);
+      }
     }, 80);
   }
 
-  /** Full reset — clears all temp visuals. */
+  /**
+   * Full reset — stops any in-progress animation and returns to blank state.
+   * Called on Collect or layout rebuild.
+   */
   reset(): void {
-    if (this.spinTween !== null) {
-      clearTimeout(this.spinTween);
-      this.spinTween = null;
-    }
-    this._spinning = false;
-    this.symbolText.text = '?';
-    this.symbolText.style.fill = 0x555577;
-    this.labelText.text = '';
-    this.drawBg(0x12122a, 0x2a2a50, 2);
+    this.ctrl.stop();
+    this._spinning  = false;
+    this.lastSymbol = null;
+    this.reel.reset();
+    this.drawOuterBg(0x12122a, 0x2a2a50, 2);
+  }
+
+  /**
+   * Remove the ticker handler.
+   * Call when this view is being discarded (e.g., layout rebuild in Game.ts).
+   */
+  destroy(): void {
+    PIXI.Ticker.shared.remove(this.tickFn);
+    this.ctrl.stop();
+  }
+
+  // ── Private ────────────────────────────────────────────────────────────────
+
+  private drawOuterBg(fill: number, stroke: number, strokeW: number): void {
+    this.outerBg.clear()
+      .roundRect(0, 0, this.size, this.size, 16)
+      .fill({ color: fill })
+      .stroke({ width: strokeW, color: stroke });
   }
 }

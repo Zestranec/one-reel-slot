@@ -55,6 +55,9 @@ export class Game {
   // ── UI construction ─────────────────────────────────────────────────────────
 
   private buildUI(L: Layout): void {
+    // Destroy previous reel to remove its shared-ticker handler before rebuild.
+    (this.reel as ReelView | undefined)?.destroy();
+
     const stage = this.app.stage;
     stage.removeChildren();
 

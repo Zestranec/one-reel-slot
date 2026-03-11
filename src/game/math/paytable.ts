@@ -1,6 +1,13 @@
 /**
  * Central configuration for all probabilities and payouts.
  * Change numbers here only – never hardcode elsewhere.
+ *
+ * Design goals:
+ *  - Tumbleweed threatening but not dominant
+ *  - GoldenSeed meaningfully present
+ *  - Flower Bonus rare but reachable in large simulations
+ *  - Collect threshold creates push-your-luck tension
+ *  - RTP ≈ 95%
  */
 
 export type SymbolId = 'Clover' | 'ForgetMeNot' | 'Rose' | 'GoldenSeed' | 'Tumbleweed';
@@ -12,11 +19,11 @@ export interface SymbolConfig {
 
 /** Symbol probabilities must sum to 1.0 */
 export const SYMBOLS: SymbolConfig[] = [
-  { id: 'Clover',      probability: 0.051  },
-  { id: 'ForgetMeNot', probability: 0.082  },
-  { id: 'Rose',        probability: 0.1435 },
-  { id: 'GoldenSeed',  probability: 0.01   },
-  { id: 'Tumbleweed',  probability: 0.7135 },
+  { id: 'Clover',      probability: 0.10  },
+  { id: 'ForgetMeNot', probability: 0.14  },
+  { id: 'Rose',        probability: 0.20  },
+  { id: 'GoldenSeed',  probability: 0.07  },
+  { id: 'Tumbleweed',  probability: 0.49  },
 ];
 
 // Sanity check (dev only)
@@ -26,27 +33,21 @@ if (Math.abs(probabilitySum - 1.0) > 1e-9) {
 }
 
 /** Ladder pay per level (index 0 = level 0 = no payout, index 1 = level 1, etc.) */
-export const CLOVER_PAY: readonly number[]      = [0, 10, 40, 100, 200, 350];
-export const FORGET_ME_NOT_PAY: readonly number[] = [0,  3,  8,  15,  30,  60];
-export const ROSE_PAY: readonly number[]          = [0,  1,  2,   4,   7,  10];
+export const CLOVER_PAY: readonly number[]        = [0,  2,  6, 18,  50, 140];
+export const FORGET_ME_NOT_PAY: readonly number[] = [0,  1,  3,  7,  16,  40];
+export const ROSE_PAY: readonly number[]          = [0,  1,  2,  3,   5,   8];
 
 /** Bonus awarded when ALL three ladders reach level 5 simultaneously. */
-export const FLOWER_BONUS = 500;
+export const FLOWER_BONUS = 250;
 
 /** Maximum ladder level */
 export const MAX_LEVEL = 5;
 
 /**
  * Collect is only enabled when collectValue >= COLLECT_MULTIPLIER * currentBet.
- * This is the primary RTP-control lever.
+ * Higher value = more tension, longer average rounds, higher peak payouts.
  */
-export const COLLECT_MULTIPLIER = 2;
-
-// TODO: Future "bonus-visible rebalance profile" hook:
-// When FLOWER_BONUS is too rare under this profile, swap out SYMBOLS above
-// (e.g. raise GoldenSeed to 0.05 and lower Tumbleweed accordingly).
-// Keep FLOWER_BONUS = 500 but reduce individual ladder pays to compensate.
-// All other game logic stays identical.
+export const COLLECT_MULTIPLIER = 5;
 
 /**
  * Compute current collect value from ladder levels (scaled by bet).
