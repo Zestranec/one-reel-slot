@@ -1,24 +1,33 @@
 /**
  * LadderView — visual progress card for a single ladder (levels 0–5).
  *
- * Sized and positioned entirely from LadderLayoutCfg.
- * All game methods (setLevel, flashWipe, flashFlowerBonus, reset) preserved.
+ * Each step displays its payout value (from paytable, optionally scaled by bet)
+ * so the player always sees what each level is worth.
+ *
+ * Constructor accepts `payouts: readonly number[]`
+ *   index 0 = unused (level 0 has no payout)
+ *   index 1 = L1 value, index 2 = L2, … index 5 = L5
+ *
+ * Pass `payouts.map(p => p * currentBet)` for bet-scaled display (future-proof).
+ * All game methods (setLevel, flashWipe, flashFlowerBonus, reset) are preserved.
  */
 import * as PIXI from 'pixi.js';
 import { MAX_LEVEL } from '../math/paytable';
 import { type LadderLayoutCfg } from './LayoutManager';
 
-/** Padding above the title text inside the card. */
 const TITLE_PAD_TOP = 10;
-/** Gap between title baseline and first step. */
-const TITLE_GAP = 6;
-/** Padding below the last step before the level counter. */
-const LEVEL_PAD = 6;
+const TITLE_GAP     = 6;
+const LEVEL_PAD     = 6;
+
+const COL_STEP_EMPTY         = 0x1e1e38;
+const COL_REWARD_INACTIVE    = 0x4a4a64;
+const COL_REWARD_ACTIVE      = 0xffffff;
+const COL_REWARD_FLASH_WHITE = 0x222233;
 
 export class LadderView {
   readonly container: PIXI.Container;
-  private steps: PIXI.Graphics[] = [];
-  private stepLabels: PIXI.Text[] = [];
+  private steps: PIXI.Graphics[]    = [];
+  private rewardLabels: PIXI.Text[] = [];  // one per step, shows payout value
   private titleText: PIXI.Text;
   private levelText: PIXI.Text;
   private cardBg: PIXI.Graphics;
@@ -26,18 +35,22 @@ export class LadderView {
   private cfg: LadderLayoutCfg;
   private wipeFlash: ReturnType<typeof setInterval> | null = null;
 
-  // Pre-computed geometry
   private readonly titleAreaH: number;
   private readonly stepsAreaH: number;
   private readonly totalH: number;
   private readonly stepX: number;
 
-  constructor(title: string, activeColor: number, cfg: LadderLayoutCfg) {
+  constructor(
+    title: string,
+    activeColor: number,
+    cfg: LadderLayoutCfg,
+    payouts: readonly number[],
+  ) {
     this.activeColor = activeColor;
     this.cfg = cfg;
     this.container = new PIXI.Container();
 
-    const { stepW, stepH, stepGap, panelW, titleFontSize, levelFontSize } = cfg;
+    const { stepW, stepH, stepGap, panelW, titleFontSize, levelFontSize, rewardFontSize } = cfg;
     this.titleAreaH = TITLE_PAD_TOP + titleFontSize + TITLE_GAP;
     this.stepsAreaH = MAX_LEVEL * stepH + (MAX_LEVEL - 1) * stepGap;
     this.totalH     = this.titleAreaH + this.stepsAreaH + LEVEL_PAD + levelFontSize + 8;
@@ -66,20 +79,19 @@ export class LadderView {
     this.titleText.position.set(panelW / 2, TITLE_PAD_TOP);
     this.container.addChild(this.titleText);
 
-    // Steps (index 0 = level 1 at bottom, index MAX_LEVEL-1 = top)
-    const labelFontSize = Math.max(9, Math.min(stepH - 4, 11));
+    // Steps + payout labels (i=0 is level 1 / bottom, i=MAX_LEVEL-1 is level 5 / top)
     for (let i = 0; i < MAX_LEVEL; i++) {
       const step = new PIXI.Graphics();
-      this.drawStep(step, 0x1e1e38, i);
+      this.drawStep(step, COL_STEP_EMPTY, i);
       this.steps.push(step);
       this.container.addChild(step);
 
-      // Level number inside each step
+      const reward = payouts[i + 1] ?? 0;
       const lbl = new PIXI.Text({
-        text: String(i + 1),
+        text: String(reward),
         style: {
-          fontSize: labelFontSize,
-          fill: 0x44445a,
+          fontSize: rewardFontSize,
+          fill: COL_REWARD_INACTIVE,
           fontFamily: 'Arial',
           fontWeight: 'bold',
           align: 'center',
@@ -90,11 +102,11 @@ export class LadderView {
         this.stepX + stepW / 2,
         this.stepY(i) + stepH / 2,
       );
-      this.stepLabels.push(lbl);
+      this.rewardLabels.push(lbl);
       this.container.addChild(lbl);
     }
 
-    // Level counter below steps
+    // "X / 5" counter below the steps
     this.levelText = new PIXI.Text({
       text: '0 / 5',
       style: {
@@ -115,7 +127,7 @@ export class LadderView {
   get width(): number  { return this.cfg.panelW; }
   get height(): number { return this.totalH; }
 
-  /** y-position of step i (0=level1/bottom, 4=level5/top) within the container. */
+  /** y-position of step i (0 = level-1 / bottom, MAX_LEVEL-1 = level-5 / top). */
   private stepY(i: number): number {
     const { stepH, stepGap } = this.cfg;
     return this.titleAreaH + (MAX_LEVEL - 1 - i) * (stepH + stepGap);
@@ -127,39 +139,40 @@ export class LadderView {
     g.roundRect(this.stepX, this.stepY(i), stepW, stepH, 4).fill({ color });
   }
 
+  // ── Public game API (all preserved) ────────────────────────────────────────
+
   setLevel(level: number, animate = false): void {
-    this.levelText.text = `${level} / ${MAX_LEVEL}`;
+    this.levelText.text       = `${level} / ${MAX_LEVEL}`;
     this.levelText.style.fill = level > 0 ? 0xaaaacc : 0x666688;
 
     for (let i = 0; i < MAX_LEVEL; i++) {
       const filled = i < level;
-      this.drawStep(this.steps[i], filled ? this.activeColor : 0x1e1e38, i);
-      this.stepLabels[i].style.fill = filled ? 0xffffff : 0x44445a;
+      this.drawStep(this.steps[i], filled ? this.activeColor : COL_STEP_EMPTY, i);
+      this.rewardLabels[i].style.fill = filled ? COL_REWARD_ACTIVE : COL_REWARD_INACTIVE;
     }
 
     if (animate && level > 0) {
-      // Flash the newly filled step white then back to active colour
       const idx = level - 1;
       this.drawStep(this.steps[idx], 0xffffff, idx);
-      this.stepLabels[idx].style.fill = 0x222233;
+      this.rewardLabels[idx].style.fill = COL_REWARD_FLASH_WHITE;
       setTimeout(() => {
         this.drawStep(this.steps[idx], this.activeColor, idx);
-        this.stepLabels[idx].style.fill = 0xffffff;
+        this.rewardLabels[idx].style.fill = COL_REWARD_ACTIVE;
       }, 180);
     }
   }
 
-  /** Flash all steps red → reset to zero (signals Tumbleweed wipe). */
+  /** Flash red then wipe — Tumbleweed signal. */
   flashWipe(): Promise<void> {
     return new Promise((resolve) => {
       if (this.wipeFlash !== null) clearInterval(this.wipeFlash);
       let toggle = false;
-      let count = 0;
+      let count  = 0;
       this.wipeFlash = setInterval(() => {
-        const color = toggle ? 0xe74c3c : 0x1e1e38;
+        const color = toggle ? 0xe74c3c : COL_STEP_EMPTY;
         for (let i = 0; i < MAX_LEVEL; i++) {
           this.drawStep(this.steps[i], color, i);
-          this.stepLabels[i].style.fill = toggle ? 0xffffff : 0x44445a;
+          this.rewardLabels[i].style.fill = toggle ? COL_REWARD_ACTIVE : COL_REWARD_INACTIVE;
         }
         toggle = !toggle;
         if (++count >= 6) {
@@ -172,22 +185,22 @@ export class LadderView {
     });
   }
 
-  /** Flash all steps gold for Flower Bonus celebration. */
+  /** Flash gold — Flower Bonus celebration. */
   flashFlowerBonus(): void {
     let toggle = false;
-    let count = 0;
+    let count  = 0;
     const id = setInterval(() => {
       const color = toggle ? 0xf1c40f : this.activeColor;
       for (let i = 0; i < MAX_LEVEL; i++) {
         this.drawStep(this.steps[i], color, i);
-        this.stepLabels[i].style.fill = 0xffffff;
+        this.rewardLabels[i].style.fill = COL_REWARD_ACTIVE;
       }
       toggle = !toggle;
       if (++count >= 8) clearInterval(id);
     }, 100);
   }
 
-  /** Instant reset, no animation. Clears all temp visuals. */
+  /** Instant reset — no animation, clears all temp visuals. */
   reset(): void {
     if (this.wipeFlash !== null) {
       clearInterval(this.wipeFlash);

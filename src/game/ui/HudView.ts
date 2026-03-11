@@ -128,11 +128,13 @@ export class HudView {
     this.statusText.position.set(stageW / 2, statusY);
     this.container.addChild(this.statusText);
 
-    // Buttons — bottom-aligned inside footer
+    // Buttons — below the status text, also never closer than `pad` from the footer bottom.
+    // Math.max ensures buttons never overlap the status line regardless of footer height.
     const { btnW, btnH, btnFontSize, btnGap, pad } = cfg;
-    const totalBtnW = btnW * 2 + btnGap;
-    const btnStartX = (stageW - totalBtnW) / 2;
-    const btnY      = h - btnH - pad;
+    const totalBtnW  = btnW * 2 + btnGap;
+    const btnStartX  = (stageW - totalBtnW) / 2;
+    const statusClearY = statusY + statusFontSize + 8;   // first safe y after status text
+    const btnY         = Math.max(h - btnH - pad, statusClearY);
 
     const [spinBtn, spinBg] = this.makeButton(
       'SPIN', COL_SPIN_ON, COL_SPIN_STROKE_ON, btnW, btnH, btnFontSize,

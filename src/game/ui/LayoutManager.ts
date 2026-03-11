@@ -2,8 +2,10 @@
  * LayoutManager — single source of truth for all stage coordinates and sizes.
  *
  * Two discrete modes: 'desktop' (≥ 520px viewport) and 'mobile' (< 520px).
- * All UI views are parameterized by Layout; Game repositions containers using it.
  * Spacing system: multiples of 8 (8 / 16 / 24 / 32).
+ *
+ * Zone layout (top → bottom):
+ *   Title | Reel | FlowerBonus panel | [arrow gap] | Ladders | Footer
  */
 
 export type LayoutMode = 'desktop' | 'mobile';
@@ -15,20 +17,28 @@ export interface LadderLayoutCfg {
   panelW: number;
   titleFontSize: number;
   levelFontSize: number;
-  gap: number;       // horizontal gap between adjacent ladder cards
-  sectionY: number;  // y of the ladder section in stage space
+  rewardFontSize: number;  // font size for the payout value rendered inside each step
+  gap: number;             // horizontal gap between adjacent ladder cards
+  sectionY: number;        // y of the ladder section in stage space
+}
+
+export interface BonusCfg {
+  panelY: number;    // top of the bonus panel in stage space
+  panelH: number;    // height of the bonus panel
+  panelW: number;    // width (centered on stageW/2)
+  fontSize: number;  // single-line text size inside the panel
 }
 
 export interface FooterCfg {
   y: number;
   h: number;
-  pad: number;          // horizontal edge padding inside footer
+  pad: number;
   statLabelSize: number;
   statValueSize: number;
   btnW: number;
   btnH: number;
   btnFontSize: number;
-  btnGap: number;       // gap between the two buttons
+  btnGap: number;
   statusFontSize: number;
 }
 
@@ -41,6 +51,7 @@ export interface Layout {
   reelX: number;
   reelY: number;
   reelSize: number;
+  bonus: BonusCfg;
   ladder: LadderLayoutCfg;
   footer: FooterCfg;
 }
@@ -52,21 +63,26 @@ export function buildLayout(viewportW: number): Layout {
 }
 
 /**
- * Desktop: 780 × 590 logical canvas.
+ * Desktop: 780 × 680 logical canvas.
  *
  * Zones (y ranges):
- *   Title:   0   – 50
- *   Reel:    50  – 270  (220 × 220)
- *   Ladders: 286 – 456
- *   Footer:  458 – 590
+ *   Title:         0  –  50
+ *   Reel:         50  – 270  (220 × 220)
+ *   Bonus panel: 282  – 326  (h=44, w=320, centred)
+ *   Arrow gap:   326  – 364  (38px)
+ *   Ladders:     364  – 548
+ *   Footer:      548  – 680
  */
 function desktopLayout(): Layout {
-  const W = 780, H = 590;
+  const W = 780, H = 680;
   const reelSize = 220;
-  const footerH = 132;
-  const footerY = H - footerH;         // 458
-  const reelY   = 50;
-  const ladderY = reelY + reelSize + 16; // 286
+  const reelY    = 50;
+  const bonusY   = reelY + reelSize + 12;  // 282
+  const bonusH   = 44;
+  const bonusW   = 320;
+  const ladderY  = bonusY + bonusH + 38;   // 364
+  const footerH  = 132;
+  const footerY  = H - footerH;             // 548
 
   return {
     mode: 'desktop',
@@ -74,9 +90,10 @@ function desktopLayout(): Layout {
     stageH: H,
     titleY: 14,
     titleFontSize: 22,
-    reelX: (W - reelSize) / 2,          // 280
+    reelX: (W - reelSize) / 2,  // 280
     reelY,
     reelSize,
+    bonus: { panelY: bonusY, panelH: bonusH, panelW: bonusW, fontSize: 13 },
     ladder: {
       stepW: 44,
       stepH: 18,
@@ -84,8 +101,9 @@ function desktopLayout(): Layout {
       panelW: 92,
       titleFontSize: 13,
       levelFontSize: 11,
+      rewardFontSize: 12,
       gap: 32,
-      sectionY: ladderY,                // 286
+      sectionY: ladderY,  // 364
     },
     footer: {
       y: footerY,
@@ -103,21 +121,26 @@ function desktopLayout(): Layout {
 }
 
 /**
- * Mobile: 390 × 660 logical canvas.
+ * Mobile: 390 × 760 logical canvas.
  *
  * Zones (y ranges):
- *   Title:   0   – 40
- *   Reel:    40  – 200  (160 × 160)
- *   Ladders: 216 – 488
- *   Footer:  492 – 660
+ *   Title:         0  –  40
+ *   Reel:         40  – 200  (160 × 160)
+ *   Bonus panel: 212  – 248  (h=36, w=250, centred)
+ *   Arrow gap:   248  – 280  (32px)
+ *   Ladders:     280  – 592
+ *   Footer:      592  – 760
  */
 function mobileLayout(): Layout {
-  const W = 390, H = 660;
+  const W = 390, H = 760;
   const reelSize = 160;
-  const footerH = 168;
-  const footerY = H - footerH;          // 492
-  const reelY   = 40;
-  const ladderY = reelY + reelSize + 16; // 216
+  const reelY    = 40;
+  const bonusY   = reelY + reelSize + 12;  // 212
+  const bonusH   = 36;
+  const bonusW   = 250;
+  const ladderY  = bonusY + bonusH + 32;   // 280
+  const footerH  = 168;
+  const footerY  = H - footerH;             // 592
 
   return {
     mode: 'mobile',
@@ -125,9 +148,10 @@ function mobileLayout(): Layout {
     stageH: H,
     titleY: 10,
     titleFontSize: 15,
-    reelX: (W - reelSize) / 2,           // 115
+    reelX: (W - reelSize) / 2,  // 115
     reelY,
     reelSize,
+    bonus: { panelY: bonusY, panelH: bonusH, panelW: bonusW, fontSize: 11 },
     ladder: {
       stepW: 36,
       stepH: 22,
@@ -135,8 +159,9 @@ function mobileLayout(): Layout {
       panelW: 76,
       titleFontSize: 11,
       levelFontSize: 11,
+      rewardFontSize: 14,
       gap: 18,
-      sectionY: ladderY,                 // 216
+      sectionY: ladderY,  // 280
     },
     footer: {
       y: footerY,
