@@ -186,13 +186,13 @@ export class Reel {
 
   /**
    * Set the current scroll position.
-   * strip.y = -ABOVE*cellH - scrollY
-   * → at scrollY=0 cell[ABOVE] is at viewport y=0.
-   * → scrollY increasing moves strip upward (symbols scroll up; new enter from below).
+   * strip.y = -(ABOVE + tapeLen - 1)*cellH + scrollY
+   * → at scrollY=0 cell[ABOVE + tapeLen - 1] (resting) is at viewport y=0.
+   * → scrollY increasing moves strip downward (symbols scroll down; new enter from above).
    */
   setScrollY(y: number): void {
     this._scrollY = y;
-    this.strip.y = -ABOVE * this.cellH - y;
+    this.strip.y = -(ABOVE + this._tapeLen - 1) * this.cellH + y;
   }
 
   /**
@@ -211,19 +211,19 @@ export class Reel {
     this.cells = [];
 
     // ── Build the symbol tape ──────────────────────────────────────────────
-    // tape[0]        = symbol shown at scrollY=0 (seamless BounceUp)
+    // tape[0]        = target (visible at finalScrollY — top of tape)
     // tape[1..N-2]   = cycling fillers shown while spinning
-    // tape[N-1]      = target
+    // tape[N-1]      = resting (visible at scrollY=0 — bottom of tape)
     this._tapeLen = minScreens + 2; // at least minScreens filler + target
     const tape: SymbolId[] = [];
 
     const resting = restingSymbol ?? FILLER[0];
-    tape.push(resting); // tape[0]
+    tape.push(target); // tape[0]
 
     for (let i = 1; i < this._tapeLen - 1; i++) {
       tape.push(FILLER[i % FILLER.length]);
     }
-    tape.push(target); // tape[last]
+    tape.push(resting); // tape[last]
 
     // ── Build cells ────────────────────────────────────────────────────────
     const totalCells = ABOVE + this._tapeLen + BELOW;
@@ -233,13 +233,13 @@ export class Reel {
       cell.container.y = j * this.cellH;
 
       if (j < ABOVE) {
-        // Above-buffer: show restingSymbol so BounceUp looks seamless.
-        cell.setSpinning(resting);
+        // Above-buffer: shown only at extreme overshoot (tiny portion); use filler.
+        cell.setSpinning(FILLER[j % FILLER.length]);
       } else if (j < ABOVE + this._tapeLen) {
         cell.setSpinning(tape[j - ABOVE]);
       } else {
-        // Below-buffer: filler for after the target.
-        cell.setSpinning(FILLER[j % FILLER.length]);
+        // Below-buffer: peeks in during BounceUp — fill with resting for seamless look.
+        cell.setSpinning(resting);
       }
 
       this.strip.addChild(cell.container);
@@ -247,7 +247,7 @@ export class Reel {
     }
 
     this._scrollY = 0;
-    this.strip.y = -ABOVE * this.cellH;
+    this.strip.y = -(ABOVE + this._tapeLen - 1) * this.cellH;
   }
 
   /**
@@ -255,7 +255,7 @@ export class Reel {
    * Call after the settling phase completes.
    */
   showFinal(sym: SymbolId): void {
-    const targetIdx = ABOVE + this._tapeLen - 1;
+    const targetIdx = ABOVE; // tape[0] = cell[ABOVE], visible at finalScrollY
     if (targetIdx < this.cells.length) {
       this.cells[targetIdx].setFinal(sym);
     }
