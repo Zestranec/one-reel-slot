@@ -226,6 +226,8 @@ export class Game {
         this.roseLadder.flashWipe(),
       ]);
       this.reel.pulse(0xe74c3c);
+    } else if (symbol === 'Empty') {
+      this.hud.setStatus('');
     } else if (symbol === 'GoldenSeed') {
       this.hud.setStatus('Golden Seed! All ladders +1!', 0xf1c40f);
       this.reel.pulse(0xf1c40f);

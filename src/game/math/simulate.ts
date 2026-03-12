@@ -63,6 +63,7 @@ export interface SimResult {
   avgPayout: number;
 
   // ── Danger ──────────────────────────────────────────────────────────────
+  emptyFrequency: number;
   tumbleweedResetFrequency: number;
   avgTumbleweeds: number;
   flowerBonusHits: number;
@@ -105,6 +106,7 @@ export function simulate(
   let totalWagered     = 0;
   let totalPaid        = 0;
   let totalSpins       = 0;
+  let totalEmpty       = 0;
   let totalTumbleweeds = 0;
   let flowerBonusHits  = 0;
 
@@ -119,7 +121,7 @@ export function simulate(
   let cntNoMeaningful     = 0;
 
   const symbolCounts: Record<SymbolId, number> = {
-    Clover: 0, ForgetMeNot: 0, Rose: 0, GoldenSeed: 0, Tumbleweed: 0,
+    Clover: 0, ForgetMeNot: 0, Rose: 0, GoldenSeed: 0, Empty: 0, Tumbleweed: 0,
   };
   const collectDist: Record<string, number> = {};
 
@@ -155,6 +157,9 @@ export function simulate(
           forget = clamp(forget + 1, MAX_LEVEL);
           rose   = clamp(rose   + 1, MAX_LEVEL);
           break;
+        case 'Empty':
+          totalEmpty++;
+          break;
         case 'Tumbleweed':
           totalTumbleweeds++;
           // Capture peak BEFORE wiping ladders.
@@ -171,7 +176,7 @@ export function simulate(
           break;
       }
 
-      if (symbol !== 'Tumbleweed') {
+      if (symbol !== 'Tumbleweed' && symbol !== 'Empty') {
         const tl = clover + forget + rose;
         if (tl > peakTotalLevels) peakTotalLevels = tl;
         if (clover > maxClover) maxClover = clover;
@@ -220,6 +225,7 @@ export function simulate(
     avgRoundLength: totalSpins / rounds,
     avgPayout:      totalPaid  / rounds,
 
+    emptyFrequency:           totalEmpty       / totalSpins,
     tumbleweedResetFrequency: totalTumbleweeds / totalSpins,
     avgTumbleweeds:           totalTumbleweeds / rounds,
     flowerBonusHits,
@@ -281,6 +287,7 @@ export function printSimResult(result: SimResult): void {
   console.log('');
 
   console.log('── Danger ────────────────────────────────────────────────────');
+  console.log(`  Empty / spin:            ${pct(result.emptyFrequency)}`);
   console.log(`  Tumbleweed / spin:       ${pct(result.tumbleweedResetFrequency)}`);
   console.log(`  Avg tumbleweeds/round:   ${result.avgTumbleweeds.toFixed(2)}`);
   console.log(`  Flower bonus hits:       ${result.flowerBonusHits.toLocaleString()}`);

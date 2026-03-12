@@ -6,6 +6,7 @@
  * - ForgetMeNot → forgetLevel  += 1 (cap 5)
  * - Rose        → roseLevel    += 1 (cap 5)
  * - GoldenSeed  → ALL ladders  += 1 (cap each at 5)
+ * - Empty       → no change (neutral spin)
  * - Tumbleweed  → ALL ladders  = 0
  */
 import { type SymbolId, MAX_LEVEL, computeCollectValue, canCollect } from '../math/paytable';
@@ -84,6 +85,9 @@ export class OutcomeController {
         s.cloverLevel = Math.min(s.cloverLevel + 1, MAX_LEVEL);
         s.forgetLevel = Math.min(s.forgetLevel + 1, MAX_LEVEL);
         s.roseLevel   = Math.min(s.roseLevel   + 1, MAX_LEVEL);
+        break;
+      case 'Empty':
+        // Neutral — no ladder changes, no collect value change.
         break;
       case 'Tumbleweed':
         s.cloverLevel = 0;

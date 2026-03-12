@@ -90,6 +90,7 @@ export class ReelView {
   /**
    * Flash the card border for emphasis (called after special symbol feedback).
    * Does not interfere with the reel strip animation.
+   * Restores idle border state once the animation completes.
    */
   pulse(color: number): void {
     let toggle = false;
@@ -99,7 +100,7 @@ export class ReelView {
       toggle = !toggle;
       if (++count >= 6) {
         clearInterval(id);
-        this.drawOuterBg(0x0d0d1f, color, 3);
+        this.drawOuterBg(0x12122a, 0x2a2a50, 2); // restore idle border
       }
     }, 80);
   }

@@ -10,7 +10,7 @@
  *  - RTP ≈ 97.5%
  */
 
-export type SymbolId = 'Clover' | 'ForgetMeNot' | 'Rose' | 'GoldenSeed' | 'Tumbleweed';
+export type SymbolId = 'Clover' | 'ForgetMeNot' | 'Rose' | 'GoldenSeed' | 'Empty' | 'Tumbleweed';
 
 export interface SymbolConfig {
   id: SymbolId;
@@ -19,11 +19,12 @@ export interface SymbolConfig {
 
 /** Symbol probabilities must sum to 1.0 */
 export const SYMBOLS: SymbolConfig[] = [
-  { id: 'Clover',      probability: 0.121 },
-  { id: 'ForgetMeNot', probability: 0.160 },
-  { id: 'Rose',        probability: 0.229 },
-  { id: 'GoldenSeed',  probability: 0.080 },
-  { id: 'Tumbleweed',  probability: 0.410 },
+  { id: 'Clover',      probability: 0.100 },
+  { id: 'ForgetMeNot', probability: 0.132 },
+  { id: 'Rose',        probability: 0.176 },
+  { id: 'GoldenSeed',  probability: 0.067 },
+  { id: 'Empty',       probability: 0.350 },
+  { id: 'Tumbleweed',  probability: 0.175 },
 ];
 
 // Sanity check (dev only)

@@ -315,6 +315,107 @@ for (const t of NP_TW_SWEEP) {
   );
 }
 
+// ── Empty-aware probability sweep ────────────────────────────────────────────
+// Tests different (Empty, Tumbleweed) combos to find the set that hits ~97.5%
+// RTP with the current v2 paytable (NP_CLOVER/FMN/ROSE) and greedy bot.
+// Progression symbol ratios held constant (C:F:R:GS = 9:12:16:6).
+
+type Sym6 = 'Clover' | 'ForgetMeNot' | 'Rose' | 'GoldenSeed' | 'Empty' | 'Tumbleweed';
+
+function makeResolver6(c: number, f: number, r: number, gs: number, e: number, tw: number) {
+  const th = [c, c+f, c+f+r, c+f+r+gs, c+f+r+gs+e, 1.0];
+  const ids: Sym6[] = ['Clover','ForgetMeNot','Rose','GoldenSeed','Empty','Tumbleweed'];
+  return (roll: number): Sym6 => {
+    for (let i = 0; i < th.length; i++) if (roll < th[i]) return ids[i];
+    return 'Tumbleweed';
+  };
+}
+
+function runSimEmpty(
+  c: number, f: number, r: number, gs: number, e: number, tw: number,
+  rounds = 400_000,
+): { rtp: number; avgN: number; avgCV: number; pct3: number; emptyPct: number; twPct: number } {
+  const rng = new RNG(42);
+  const resolve = makeResolver6(c, f, r, gs, e, tw);
+  const bet = 1;
+  let wg = 0, pd = 0, sp = 0, c3 = 0, emptyCnt = 0, twCnt = 0;
+  for (let round = 0; round < rounds; round++) {
+    let lc=0, lf=0, lo=0, peak=0;
+    let done = false;
+    while (!done) {
+      const sym = resolve(rng.next());
+      sp++; wg += bet;
+      switch (sym) {
+        case 'Clover':      lc = clamp(lc+1, MAX_LEVEL); break;
+        case 'ForgetMeNot': lf = clamp(lf+1, MAX_LEVEL); break;
+        case 'Rose':        lo = clamp(lo+1, MAX_LEVEL); break;
+        case 'GoldenSeed':
+          lc=clamp(lc+1,MAX_LEVEL); lf=clamp(lf+1,MAX_LEVEL); lo=clamp(lo+1,MAX_LEVEL); break;
+        case 'Empty':       emptyCnt++; break;  // neutral — no ladder change
+        case 'Tumbleweed':  lc=0; lf=0; lo=0; twCnt++; break;
+      }
+      const p2 = lc+lf+lo; if (p2 > peak) peak = p2;
+      const bonus = (lc===MAX_LEVEL && lf===MAX_LEVEL && lo===MAX_LEVEL) ? NP_FLOWER : 0;
+      const cv = (NP_CLOVER[lc]+NP_FMN[lf]+NP_ROSE[lo]+bonus)*bet;
+      if (cv >= NP_THRESH) { pd += cv; done = true; }
+    }
+    if (peak >= 3) c3++;
+  }
+  return { rtp: pd/wg, avgN: sp/rounds, avgCV: pd/rounds,
+           pct3: c3/rounds, emptyPct: emptyCnt/sp, twPct: twCnt/sp };
+}
+
+// Progression base ratios: C:F:R:GS = 9:12:16:6 (sum=43)
+const PROG_SUM_E = 9 + 12 + 16 + 6;
+
+function makeEmptyProbs(e: number, tw: number): [number,number,number,number,number,number] {
+  const prog = 1 - e - tw;
+  return [
+    prog * 9  / PROG_SUM_E,
+    prog * 12 / PROG_SUM_E,
+    prog * 16 / PROG_SUM_E,
+    prog * 6  / PROG_SUM_E,
+    e,
+    tw,
+  ];
+}
+
+interface EmptySweepRow { label: string; e: number; tw: number; }
+const EMPTY_TESTS: EmptySweepRow[] = [
+  { label: 'E=35 Tw=22 (candidate)',  e: 0.35, tw: 0.22 },
+  { label: 'E=35 Tw=18',             e: 0.35, tw: 0.18 },
+  { label: 'E=35 Tw=15',             e: 0.35, tw: 0.15 },
+  { label: 'E=35 Tw=12',             e: 0.35, tw: 0.12 },
+  { label: 'E=35 Tw=10',             e: 0.35, tw: 0.10 },
+  { label: 'E=30 Tw=22',             e: 0.30, tw: 0.22 },
+  { label: 'E=30 Tw=18',             e: 0.30, tw: 0.18 },
+  { label: 'E=30 Tw=15',             e: 0.30, tw: 0.15 },
+  { label: 'E=30 Tw=12',             e: 0.30, tw: 0.12 },
+  { label: 'E=30 Tw=10',             e: 0.30, tw: 0.10 },
+  { label: 'E=25 Tw=22',             e: 0.25, tw: 0.22 },
+  { label: 'E=25 Tw=18',             e: 0.25, tw: 0.18 },
+  { label: 'E=25 Tw=15',             e: 0.25, tw: 0.15 },
+  { label: 'E=25 Tw=12',             e: 0.25, tw: 0.12 },
+  { label: 'E=20 Tw=18',             e: 0.20, tw: 0.18 },
+  { label: 'E=20 Tw=15',             e: 0.20, tw: 0.15 },
+  { label: 'E=20 Tw=12',             e: 0.20, tw: 0.12 },
+];
+
+console.log('\n── Empty-aware probability sweep (v2 paytable, greedy bot) ─────────────');
+console.log('  Config                      RTP      avgN  avgCV  ≥3lv  Empty  Tw');
+console.log('  ' + '─'.repeat(74));
+for (const row of EMPTY_TESTS) {
+  const [c, f, r, gs, e, tw] = makeEmptyProbs(row.e, row.tw);
+  const res = runSimEmpty(c, f, r, gs, e, tw);
+  const flag = Math.abs(res.rtp - 0.975) < 0.015 ? ' ← target' : '';
+  console.log(
+    `  ${row.label.padEnd(28)} ${(res.rtp*100).toFixed(2).padStart(6)}%` +
+    ` ${res.avgN.toFixed(2).padStart(6)} ${res.avgCV.toFixed(2).padStart(6)}` +
+    ` ${(res.pct3*100).toFixed(0).padStart(4)}%` +
+    ` ${(res.emptyPct*100).toFixed(0).padStart(5)}% ${(res.twPct*100).toFixed(0).padStart(4)}%${flag}`,
+  );
+}
+
 // ── Sweep ────────────────────────────────────────────────────────────────────
 // Fine-grained scan around the non-linear phase transition (scale ≈ 5/3 ≈ 1.667)
 const scales = [1.50, 1.55, 1.58, 1.60, 1.62, 1.64, 1.66, 1.667, 1.67, 1.70, 1.75, 1.80];
